@@ -1,0 +1,25 @@
+# only meta info here, nothing about the individual steps
+
+base = "test.toml"
+
+[train]
+command = "python3 my_model.py train"
+venv = "venv"  # path to some virtualenv
+
+[train.options]
+# this will cause execution to be called with python3 my_model.py train --foo=bar
+foo = "bar"
+
+[eval]
+command = "python3 my_model.py eval"
+venv = "venv"
+
+[train_and_eval]
+command = ["train", "eval"]
+
+[train_and_eval.options]
+[train_and_eval.options.train]
+foo = "bat"
+
+[train_and_eval.options.eval]
+foo = "lol"
