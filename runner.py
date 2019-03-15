@@ -23,7 +23,8 @@ def get_overrides(ctx):
     overrides = {}
     remaining = iter(ctx.args)
     for option in remaining:
-        assert option.startswith("--")  # only options are allowed
+        if not option.startswith("--"):  # only options are allowed
+            raise click.BadParameter(option)
         if "=" in option:
             option, value = option.split("=", maxsplit=1)
         else:
