@@ -16,21 +16,27 @@ def get_config(filename):
 
 
 def get_overrides(ctx):
-    return {
-        first: second for (first, second) in pairwise(ctx.args)
-    }
+    def set_recursive(store, dotted_name, value):
+        head, _, tail = dotted_name.partition(".")
+        if tail:
+            store.setdefault(head, {})
+            set_recursive(store[head], tail, value)
+        else:
+            store[head] = value
+
+    overrides = {}
+    for first, second in pairwise(ctx.args):
+        assert first.startswith("--")
+        set_recursive(overrides, first[2:], second)
+    return overrides
 
 
-@click.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
-)
+@click.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 @click.argument("config", type=click.Path())
 @click.pass_context
 def cli(ctx, config):
-    overrides = get_overrides(ctx)
-    config = get_config(config)
+    config = {**get_config(config), **get_overrides(ctx)}
     print("config:", config)
-    print("extra args:", overrides)
 
 
 if __name__ == "__main__":
