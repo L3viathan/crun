@@ -1,10 +1,6 @@
+from itertools import zip_longest
 import click
 import toml
-
-
-def pairwise(something):
-    iterator = iter(something)
-    yield from zip(iterator, iterator)
 
 
 def get_config(filename):
@@ -25,9 +21,14 @@ def get_overrides(ctx):
             store[head] = value
 
     overrides = {}
-    for first, second in pairwise(ctx.args):
-        assert first.startswith("--")
-        set_recursive(overrides, first[2:], second)
+    remaining = iter(ctx.args)
+    for option in remaining:
+        assert option.startswith("--")  # only options are allowed
+        if "=" in option:
+            option, value = option.split("=", maxsplit=1)
+        else:
+            value = next(remaining)
+        set_recursive(overrides, option[2:], value)
     return overrides
 
 
