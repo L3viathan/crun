@@ -89,13 +89,13 @@ def apply_overrides(config, ctx):
 @click.pass_context
 def cli(ctx, config, command):
     config = get_config(config)
-    apply_overrides(config[command], ctx)
     if not command:
         print("Available commands:")
         for key in config:
             if isinstance(config[key], dict):
                 print(f"\t{key}")
         return
+    apply_overrides(config[command], ctx)
     try:
         run_command(command, config)
     except ValueError as e:
