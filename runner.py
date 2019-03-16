@@ -1,14 +1,64 @@
-from itertools import zip_longest
+import os
+import subprocess
 import click
 import toml
 
 
+# TODO: logging
+def run_command(command, config):
+    if isinstance(command, str):  # command label
+        command = get_command(command, config)
+    if isinstance(command["command"], list):  # pipeline
+        for cmd in command["command"]:
+            # if we override settings of a command in a pipeline
+            if cmd in command:
+                config[cmd].update(command[cmd])
+            run_command(cmd, config)  # have to resolve command labels
+        return
+
+    if "environment" in command:
+        env = os.environ.copy()
+        env.update(command["environment"])
+    else:
+        env = None
+
+    if "options" in command:
+        opts = " ".join(
+            f"--{key}={val}" for (key, val) in command["options"].items()
+        )
+    else:
+        opts = ""
+
+    subprocess.run(
+        "{} {}".format(command["command"], opts), env=env, shell=True
+    )
+
+
+def get_command(command, config):
+    if command not in config:
+        raise ValueError("Command {command} not found in configuration.")
+    if (
+        not isinstance(config[command], dict)
+        or "command" not in config[command]
+    ):
+        raise ValueError(
+            "Command {command} must be a table, with the command value set."
+        )
+    return config[command]
+
+
 def get_config(filename):
-    with open(filename) as f:
-        data = toml.load(f)
-        if "base" in data:
-            data = {**get_config(data["base"]), **data}
-    return data
+    try:
+        with open(filename) as f:
+            data = toml.load(f)
+            if "base" in data:
+                data = {**get_config(data["base"]), **data}
+        return data
+    except FileNotFoundError:
+        raise click.BadOptionUsage(
+            option_name="--config",
+            message=f"Configuration file {filename} not found.",
+        )
 
 
 def get_overrides(ctx):
@@ -33,12 +83,25 @@ def get_overrides(ctx):
     return overrides
 
 
-@click.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
-@click.argument("config", type=click.Path())
+@click.command(
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
+)
+@click.option("--config", "-c", type=click.Path(), default="project.toml")
+@click.argument("command", type=str, required=False)
 @click.pass_context
-def cli(ctx, config):
+def cli(ctx, config, command):
     config = {**get_config(config), **get_overrides(ctx)}
-    print("config:", config)
+    if not command:
+        print("Available commands:")
+        for key in config:
+            if isinstance(config[key], dict):
+                print(f"\t{key}")
+        return
+    try:
+        run_command(command, config)
+    except ValueError as e:
+        print(e.args[0])
+        return
 
 
 if __name__ == "__main__":
