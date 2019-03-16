@@ -61,7 +61,7 @@ def get_config(filename):
         )
 
 
-def get_overrides(ctx):
+def apply_overrides(config, ctx):
     def set_recursive(store, dotted_name, value):
         head, _, tail = dotted_name.partition(".")
         if tail:
@@ -70,7 +70,6 @@ def get_overrides(ctx):
         else:
             store[head] = value
 
-    overrides = {}
     remaining = iter(ctx.args)
     for option in remaining:
         if not option.startswith("--"):  # only options are allowed
@@ -79,8 +78,7 @@ def get_overrides(ctx):
             option, value = option.split("=", maxsplit=1)
         else:
             value = next(remaining)
-        set_recursive(overrides, option[2:], value)
-    return overrides
+        set_recursive(config, option[2:], value)
 
 
 @click.command(
@@ -90,7 +88,8 @@ def get_overrides(ctx):
 @click.argument("command", type=str, required=False)
 @click.pass_context
 def cli(ctx, config, command):
-    config = {**get_config(config), **get_overrides(ctx)}
+    config = get_config(config)
+    apply_overrides(config[command], ctx)
     if not command:
         print("Available commands:")
         for key in config:
