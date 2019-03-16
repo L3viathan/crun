@@ -36,13 +36,13 @@ def run_command(command, config):
 
 def get_command(command, config):
     if command not in config:
-        raise ValueError("Command {command} not found in configuration.")
+        raise ValueError(f"Command {command} not found in configuration.")
     if (
         not isinstance(config[command], dict)
         or "command" not in config[command]
     ):
         raise ValueError(
-            "Command {command} must be a table, with the command value set."
+            f"Command {command} must be a table, with the command value set."
         )
     return config[command]
 
