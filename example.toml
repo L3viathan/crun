@@ -3,23 +3,22 @@
 base = "test.toml"
 
 [train]
-command = "python3 my_model.py train"
+command = """python3 -c 'print(__import__("os").environ["foo"])'"""
 venv = "venv"  # path to some virtualenv
 
-[train.options]
+[train.environment]
 # this will cause execution to be called with python3 my_model.py train --foo=bar
 foo = "bar"
 
 [eval]
-command = "python3 my_model.py eval"
+command = "echo hiii"
 venv = "venv"
 
 [train_and_eval]
 command = ["train", "eval"]
 
-[train_and_eval.options]
-[train_and_eval.options.train]
+[train_and_eval.train.environment]
 foo = "bat"
 
-[train_and_eval.options.eval]
+[train_and_eval.eval.options]
 foo = "lol"
