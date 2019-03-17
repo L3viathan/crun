@@ -21,10 +21,30 @@ COLORS = {
 
 
 class LogColorizer:
+    @staticmethod
+    def arg_wrapper(log_color, arg):
+        """
+        Wrap an argument in white non-destructively.
+
+        If we'd use colorful.white() directly, we'd lose the style of the
+        surrounding log level.
+        """
+        return "{}{}{}".format(colorful.white.style[0], arg, log_color.style[0])
+
     def __getattr__(self, attr):
+        """
+        Handle calls to log.debug, log.warning, etc.
+
+        We mostly hand those calls off to logger.*, but wrap the message in an
+        appropriate color based on the log level of the message. Arguments are
+        colored differently.
+        """
+        log_color = COLORS[attr]
+
         def wrapper(message, *args):
             return getattr(logger, attr)(
-                COLORS[attr](message), *(colorful.white(arg) for arg in args)
+                log_color(message),
+                *(self.arg_wrapper(log_color, arg) for arg in args)
             )
 
         return wrapper

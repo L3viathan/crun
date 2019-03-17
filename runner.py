@@ -11,7 +11,7 @@ def run_command(command, config):
         log.debug("Resolving command %s", command)
         command = get_command(command, config)
     if isinstance(command["command"], list):  # pipeline
-        log.debug("Resolving pipeline command %s", command)
+        log.debug("Resolving pipeline command %s", command["command"])
         for cmd in command["command"]:
             # if we override settings of a command in a pipeline
             if cmd in command:
@@ -35,10 +35,12 @@ def run_command(command, config):
     else:
         opts = ""
 
-    log.info("Running command %s", command["command"])
+    cmd = "{} {}".format(command["command"], opts)
+    log.info("Running command %s", cmd)
     subprocess.run(
-        "{} {}".format(command["command"], opts), env=env, shell=True
+        cmd, env=env, shell=True
     )
+    log.info("Command %s finished", cmd)
 
 
 def get_command(command, config):
