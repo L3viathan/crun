@@ -3,32 +3,39 @@ import subprocess
 import click
 import toml
 
+from fanciness import log, click_verbosity
 
 # TODO: logging
 def run_command(command, config):
     if isinstance(command, str):  # command label
+        log.debug("Resolving command %s", command)
         command = get_command(command, config)
     if isinstance(command["command"], list):  # pipeline
+        log.debug("Resolving pipeline command %s", command)
         for cmd in command["command"]:
             # if we override settings of a command in a pipeline
             if cmd in command:
+                log.debug("Overriding config from pipeline command")
                 config[cmd].update(command[cmd])
             run_command(cmd, config)  # have to resolve command labels
         return
 
     if "environment" in command:
+        log.debug("Updating environment variables")
         env = os.environ.copy()
         env.update(command["environment"])
     else:
         env = None
 
     if "options" in command:
+        log.debug("Adding options")
         opts = " ".join(
             f"--{key}={val}" for (key, val) in command["options"].items()
         )
     else:
         opts = ""
 
+    log.info("Running command %s", command["command"])
     subprocess.run(
         "{} {}".format(command["command"], opts), env=env, shell=True
     )
@@ -85,9 +92,11 @@ def apply_overrides(config, ctx):
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
+@click_verbosity
 @click.argument("command", type=str, required=False)
 @click.pass_context
 def cli(ctx, config, command):
+    log.debug("Loading config")
     config = get_config(config)
     if not command:
         print("Available commands:")
@@ -95,6 +104,7 @@ def cli(ctx, config, command):
             if isinstance(config[key], dict):
                 print(f"\t{key}")
         return
+    log.debug("Applying overrides from options")
     apply_overrides(config[command], ctx)
     try:
         run_command(command, config)
