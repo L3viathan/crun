@@ -49,6 +49,9 @@ class LogColorizer:
 
         return wrapper
 
+    def echo(self, message, *args):
+        print(colorful.cyan(message) % (colorful.white(arg) for arg in args))
+
 
 log = LogColorizer()
 
