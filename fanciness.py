@@ -21,6 +21,11 @@ COLORS = {
 
 
 class ColorfulCommand(click.Command):
+    def get_usage(self, ctx):
+        formatter = self.make_formatter(ctx)
+        self.format_usage(ctx, formatter)
+        return formatter.getvalue().rstrip('\n')
+
     def get_help(self, ctx):
         formatter = self.make_formatter(ctx)
         self.format_help(ctx, formatter)
@@ -36,7 +41,7 @@ class ColoredHelpFormatter(click.HelpFormatter):
     def write_usage(self, prog, args="", prefix="Usage: "):
         return super().write_usage(
             colorful.white(prog),
-            args=colorful.cyan(args),
+            args=args,
             prefix=colorful.green(prefix),
         )
 
@@ -77,7 +82,7 @@ class LogColorizer:
         return wrapper
 
     def echo(self, message, *args):
-        print(colorful.cyan(message) % (colorful.white(arg) for arg in args))
+        print(str(colorful.cyan(message)) % tuple(colorful.white(arg) for arg in args))
 
 
 log = LogColorizer()

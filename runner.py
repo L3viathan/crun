@@ -4,7 +4,8 @@ import click
 import toml
 import colorful
 
-from fanciness import log, click_verbosity
+from fanciness import log, click_verbosity, ColorfulCommand
+
 
 def run_command(command, config):
     if isinstance(command, str):  # command label
@@ -37,9 +38,7 @@ def run_command(command, config):
 
     cmd = "{} {}".format(command["command"], opts)
     log.info("Running command %s", cmd)
-    subprocess.run(
-        cmd, env=env, shell=True
-    )
+    subprocess.run(cmd, env=env, shell=True)
     log.info("Command %s finished", cmd)
 
 
@@ -66,7 +65,7 @@ def get_config(filename):
     except FileNotFoundError:
         raise click.BadOptionUsage(
             option_name="--config",
-            message=f"Configuration file {filename} not found.",
+            message=colorful.red(f"Configuration file {filename} not found."),
         )
 
 
@@ -91,7 +90,8 @@ def apply_overrides(config, ctx):
 
 
 @click.command(
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True}
+    cls=ColorfulCommand,
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
 @click_verbosity
@@ -101,10 +101,10 @@ def cli(ctx, config, command):
     log.debug("Loading config")
     config = get_config(config)
     if not command:
-        print(colorful.cyan("Available commands:"))
+        log.echo("Available commands:")
         for key in config:
             if isinstance(config[key], dict):
-                print(colorful.white(f"\t{key}"))
+                log.echo("\t%s", key)
         return
     log.debug("Applying overrides from options")
     apply_overrides(config[command], ctx)
@@ -116,5 +116,4 @@ def cli(ctx, config, command):
 
 
 if __name__ == "__main__":
-    import ipdb; ipdb.set_trace()
     cli()  # pylint: disable=no-value-for-parameter
