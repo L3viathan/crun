@@ -20,6 +20,33 @@ COLORS = {
 }
 
 
+class ColorfulCommand(click.Command):
+    def get_help(self, ctx):
+        formatter = self.make_formatter(ctx)
+        self.format_help(ctx, formatter)
+        return formatter.getvalue().rstrip("\n")
+
+    def make_formatter(self, ctx):
+        return ColoredHelpFormatter(
+            width=ctx.terminal_width, max_width=ctx.max_content_width
+        )
+
+
+class ColoredHelpFormatter(click.HelpFormatter):
+    def write_usage(self, prog, args="", prefix="Usage: "):
+        return super().write_usage(
+            colorful.white(prog),
+            args=colorful.cyan(args),
+            prefix=colorful.green(prefix),
+        )
+
+    def write_heading(self, heading):
+        return super().write_heading(colorful.green(heading))
+
+    # def write_dl(self, rows, col_max=30, col_spacing=2):
+    #     ...
+
+
 class LogColorizer:
     @staticmethod
     def arg_wrapper(log_color, arg):
