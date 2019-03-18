@@ -2,10 +2,10 @@ import os
 import subprocess
 import click
 import toml
+import colorful
 
 from fanciness import log, click_verbosity
 
-# TODO: logging
 def run_command(command, config):
     if isinstance(command, str):  # command label
         log.debug("Resolving command %s", command)
@@ -101,19 +101,20 @@ def cli(ctx, config, command):
     log.debug("Loading config")
     config = get_config(config)
     if not command:
-        print("Available commands:")
+        print(colorful.cyan("Available commands:"))
         for key in config:
             if isinstance(config[key], dict):
-                print(f"\t{key}")
+                print(colorful.white(f"\t{key}"))
         return
     log.debug("Applying overrides from options")
     apply_overrides(config[command], ctx)
     try:
         run_command(command, config)
     except ValueError as e:
-        print(e.args[0])
+        log.critical(e.args[0])
         return
 
 
 if __name__ == "__main__":
+    import ipdb; ipdb.set_trace()
     cli()  # pylint: disable=no-value-for-parameter
