@@ -1,0 +1,14 @@
+[build]
+command = "python3 setup.py sdist"
+
+[upload]
+command = "twine upload dist/*"
+
+[clean]
+command = "rm dist/*"
+
+[versionbump]
+command = """cat setup.py | python3 -c 'for line in __import__("sys").stdin:__import__("sys").stdout.write(__import__("re").sub("version=\\"(.*?)\\"", lambda x: ("version=\\"" + ".".join(str(int(y)+1 if i==2 else int(y)) for i, y in enumerate(x.group(1).split("."))) + "\\""), line))' > setup.py.new && mv setup.py.new setup.py"""
+
+[publish]
+command = ["versionbump", "build", "upload", "clean"]
