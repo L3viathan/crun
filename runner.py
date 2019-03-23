@@ -31,13 +31,15 @@ def run_command(command, config):
 
     if "options" in command:
         log.debug("Adding options")
-        opts = " ".join(
-            f"--{key}={val}" for (key, val) in command["options"].items()
+        opts = " {}".format(
+            " ".join(
+                f"--{key}={val}" for (key, val) in command["options"].items()
+            )
         )
     else:
         opts = ""
 
-    cmd = "{} {}".format(command["command"], opts)
+    cmd = "{}{}".format(command["command"], opts)
     log.info("Running command %s", cmd)
     try:
         subprocess.run(cmd, env=env, shell=True, check=True)
