@@ -90,14 +90,24 @@ def apply_overrides(config, ctx):
         else:
             store[head] = value
 
-    remaining = iter(ctx.args)
-    for option in remaining:
+    remaining = list(ctx.args)
+    while remaining:
+        option = remaining.pop(0)
         if not option.startswith("--"):  # only options are allowed
             raise click.BadParameter(option)
         if "=" in option:
             option, value = option.split("=", maxsplit=1)
         else:
-            value = next(remaining)
+            try:
+                maybe_value = remaining.pop(0)
+                if maybe_value.startswith("--"):
+                    remaining.insert(0, maybe_value)  # place back option
+                    raise IndexError
+                value = maybe_value
+            except IndexError:
+                # no next value or next value is an option -> we have a flag
+                value = True
+
         set_recursive(config, option[2:], value)
 
 
