@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import click
 import toml
@@ -38,8 +39,17 @@ def run_command(command, config):
 
     cmd = "{} {}".format(command["command"], opts)
     log.info("Running command %s", cmd)
-    subprocess.run(cmd, env=env, shell=True)
-    log.info("Command %s finished", cmd)
+    try:
+        subprocess.run(cmd, env=env, shell=True, check=True)
+        log.info("Command %s finished", cmd)
+    except subprocess.CalledProcessError as e:
+        if command.get("fail_ok", False):
+            return log.info("Command %s finished", cmd)
+        log.error(
+            "Command %s returned with non-zero exit code %s", cmd, e.returncode
+        )
+        if config.get("fail_ok", False) is False:
+            raise e
 
 
 def get_command(command, config):
@@ -112,7 +122,10 @@ def cli(ctx, config, command):
         run_command(command, config)
     except ValueError as e:
         log.critical(e.args[0])
-        return
+        sys.exit(2)
+    except subprocess.CalledProcessError:
+        log.critical("Exiting due to error in command")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,1 +1,14 @@
 foo="bar"
+fail_ok=true
+
+[fail]
+command="false"
+
+[succeed]
+command="true"
+
+[hello]
+command="echo hello"
+
+[test]
+command=["succeed", "fail", "hello"]
