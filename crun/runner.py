@@ -133,6 +133,8 @@ def apply_overrides(config, ctx):
 def cli(ctx, config, command):
     log.debug("Loading config")
     config = get_config(config)
+    command = command or config.get("default_command")
+
     if not command:
         log.echo("Available commands:")
         for key in config:

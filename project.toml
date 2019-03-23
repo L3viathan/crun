@@ -1,3 +1,5 @@
+default_command = "clean"
+
 [build]
 command = "python3 setup.py sdist"
 
