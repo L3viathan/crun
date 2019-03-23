@@ -8,47 +8,58 @@ import colorful
 from .fanciness import log, click_verbosity, ColorfulCommand
 
 
-def run_command(command, config):
-    if isinstance(command, str):  # command label
-        log.debug("Resolving command %s", command)
-        command = get_command(command, config)
-    if isinstance(command["command"], list):  # pipeline
-        log.debug("Resolving pipeline command %s", command["command"])
-        for cmd in command["command"]:
-            # if we override settings of a command in a pipeline
-            if cmd in command:
-                log.debug("Overriding config from pipeline command")
-                config[cmd].update(command[cmd])
-            run_command(cmd, config)  # have to resolve command labels
-        return
+def run_pipeline(label, command, config):
+    log.debug("Resolving pipeline command %s", label)
+    for cmd in command["command"]:
+        # if we override settings of a command in a pipeline
+        if cmd in command:
+            log.debug("Overriding config from pipeline command")
+            config[cmd].update(command[cmd])
+        run_command(cmd, config)  # have to resolve command labels
 
+
+def get_environment(command):
     if "environment" in command:
         log.debug("Updating environment variables")
         env = os.environ.copy()
         env.update(command["environment"])
+        return env
     else:
-        env = None
+        return None
 
+
+def get_options(command):
     if "options" in command:
         log.debug("Adding options")
-        opts = " {}".format(
+        return " {}".format(
             " ".join(
                 f"--{key}={val}" for (key, val) in command["options"].items()
             )
         )
     else:
-        opts = ""
+        return ""
+
+
+def run_command(label, config):
+    command = get_command(label, config)
+    if isinstance(command["command"], list):  # pipeline
+        return run_pipeline(label, command, config)
+
+    env = get_environment(command)
+    opts = get_options(command)
 
     cmd = "{}{}".format(command["command"], opts)
-    log.info("Running command %s", cmd)
+    log.info("Running command %s", label)
     try:
         subprocess.run(cmd, env=env, shell=True, check=True)
-        log.info("Command %s finished", cmd)
+        log.info("Command %s finished", label)
     except subprocess.CalledProcessError as e:
         if command.get("fail_ok", False):
-            return log.info("Command %s finished", cmd)
+            return log.info("Command %s finished", label)
         log.error(
-            "Command %s returned with non-zero exit code %s", cmd, e.returncode
+            "Command %s returned with non-zero exit code %s",
+            label,
+            e.returncode,
         )
         if config.get("fail_ok", False) is False:
             raise e
