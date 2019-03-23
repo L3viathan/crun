@@ -5,7 +5,7 @@ import click
 import toml
 import colorful
 
-from fanciness import log, click_verbosity, ColorfulCommand
+from .fanciness import log, click_verbosity, ColorfulCommand
 
 
 def run_command(command, config):
