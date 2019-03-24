@@ -105,6 +105,7 @@ class ConfigJob(Job):
                 " ".join(
                     (f"--{key}" if val is True else f"--{key}={val}")
                     for (key, val) in self.options.items()
+                    if val is not False
                 )
             )
         else:
