@@ -9,87 +9,6 @@ from .fanciness import log, click_verbosity, ColorfulCommand
 from . import builtin
 
 
-def run_pipeline(label, command, config):
-    log.debug("Resolving pipeline command %s", label)
-    for cmd in command["command"]:
-        # if we override settings of a command in a pipeline
-        if cmd in command:
-            log.debug("Overriding config from pipeline command")
-            config[cmd].update(command[cmd])
-        run_command(cmd, config)  # have to resolve command labels
-
-
-def get_environment(command):
-    if "environment" in command:
-        log.debug("Updating environment variables")
-        env = os.environ.copy()
-        env.update(command["environment"])
-        return env
-    else:
-        return None
-
-
-def get_options(command):
-    if "options" in command:
-        log.debug("Adding options")
-        return " {}".format(
-            " ".join(
-                (f"--{key}" if val is True else f"--{key}={val}")
-                for (key, val) in command["options"].items()
-            )
-        )
-    else:
-        return ""
-
-
-def run_builtin(command, label, config):
-    fn = getattr(builtin, command["command"][1:])
-    log.info("Running builtin %s", label)
-    fn(command, label, config)
-    log.info("Builtin %s finished", label)
-
-
-def run_command(label, config):
-    command = get_command(label, config)
-    if isinstance(command["command"], list):  # pipeline
-        return run_pipeline(label, command, config)
-
-    if command["command"].startswith("_"):  # builtin
-        return run_builtin(command, label, config)
-
-    env = get_environment(command)
-    opts = get_options(command)
-
-    cmd = "{}{}".format(command["command"], opts)
-    log.info("Running command %s", label)
-    try:
-        subprocess.run(cmd, env=env, shell=True, check=True)
-        log.info("Command %s finished", label)
-    except subprocess.CalledProcessError as e:
-        if command.get("fail_ok", False):
-            return log.info("Command %s finished", label)
-        log.error(
-            "Command %s returned with non-zero exit code %s",
-            label,
-            e.returncode,
-        )
-        if config.get("fail_ok", False) is False:
-            raise e
-
-
-def get_command(command, config):
-    if command not in config:
-        raise ValueError(f"Command {command} not found in configuration.")
-    if (
-        not isinstance(config[command], dict)
-        or "command" not in config[command]
-    ):
-        raise ValueError(
-            f"Command {command} must be a table, with the command value set."
-        )
-    return config[command]
-
-
 def get_config(filename):
     try:
         with open(filename) as f:
@@ -104,15 +23,8 @@ def get_config(filename):
         )
 
 
-def apply_overrides(config, ctx):
-    def set_recursive(store, dotted_name, value):
-        head, _, tail = dotted_name.partition(".")
-        if tail:
-            store.setdefault(head, {})
-            set_recursive(store[head], tail, value)
-        else:
-            store[head] = value
-
+def make_options(ctx):
+    options = {}
     remaining = list(ctx.args)
     while remaining:
         option = remaining.pop(0)
@@ -131,7 +43,88 @@ def apply_overrides(config, ctx):
                 # no next value or next value is an option -> we have a flag
                 value = True
 
-        set_recursive(config, option[2:], value)
+        options[option[2:]] = value
+    return options
+
+
+def get_job(config, label):
+    if label in config:
+        if isinstance(config[label], list):
+            return Pipeline(config, label)
+        else:
+            return ConfigJob(config, label)
+    elif label.startswith("_"):
+        return BuiltinJob(config, label)
+    log.critical("No job called %s was found", label)
+    sys.exit(3)
+
+
+class Job:
+    def __init__(self, config, label):
+        self.label = label
+        self.options = {}
+        self.settings = config[label] if label in config else {}
+
+
+class Pipeline(Job):
+    def __init__(self, config, label):
+        super().__init__(config, label)
+        self.jobs = [get_job(config, lab) for lab in config[label]]
+
+    def run(self):
+        for job in self.jobs:
+            for opt in self.options:
+                if opt.startswith(f"{job.label}."):
+                    job.options[opt[len(job.label) + 1 :]] = self.options[opt]
+            job.run()
+
+
+class ConfigJob(Job):
+    def __init__(self, config, label):
+        super().__init__(config, label)
+        self.cmd = self.settings["command"]
+        self.options = {
+            key: val for key, val in self.settings.get("options", {})
+        }
+        self.env = os.environ.copy()
+        self.env.update(
+            {key: val for key, val in self.settings.get("environment", {})}
+        )
+
+    def bake_options(self):
+        if self.options:
+            return " {}".format(
+                " ".join(
+                    (f"--{key}" if val is True else f"--{key}={val}")
+                    for (key, val) in self.options.items()
+                )
+            )
+        else:
+            return ""
+
+    def run(self):
+        cmd = "{}{}".format(self.cmd, self.bake_options())
+        log.info("Running command %s", self.label)
+        try:
+            subprocess.run(cmd, env=self.env, shell=True, check=True)
+            return log.info("Command %s finished", self.label)
+        except subprocess.CalledProcessError as e:
+            if self.settings.get("fail_ok", False):
+                return log.info("Command %s finished", self.label)
+            log.error(
+                "Command %s returned with non-zero exit code %s",
+                self.label,
+                e.returncode,
+            )
+            raise e
+
+
+class BuiltinJob(Job):
+    def __init__(self, config, label):
+        super().__init__(config, label)
+        self.fn = getattr(builtin, label[1:])
+    def run(self):
+        self.fn(self.label, self.options, self.settings)
 
 
 @click.command(
@@ -140,23 +133,25 @@ def apply_overrides(config, ctx):
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
 @click_verbosity
-@click.argument("command", type=str, required=False)
+@click.argument("label", type=str, required=False)
 @click.pass_context
-def cli(ctx, config, command):
+def cli(ctx, config, label):
     log.debug("Loading config")
     config = get_config(config)
-    command = command or config.get("default_command")
+    label = label or config.get("default_command")
 
-    if not command:
-        log.echo("Available commands:")
+    if not label:
+        log.echo("Available jobs:")
         for key in config:
             if isinstance(config[key], dict):
                 log.echo("\t%s", key)
         return
+    job = get_job(config, label)
+
     log.debug("Applying overrides from options")
-    apply_overrides(config[command], ctx)
+    job.options.update(make_options(ctx))
     try:
-        run_command(command, config)
+        job.run()
     except ValueError as e:
         log.critical(e.args[0])
         sys.exit(2)
