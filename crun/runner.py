@@ -76,6 +76,7 @@ class Job:
         self.label = label
         self.options = {}
         self.env = {}
+        self.global_options = {}
         self.settings = config[label] if label in config else {}
 
     def override_settings(self, overrides):
@@ -105,6 +106,7 @@ class Pipeline(Job):
         for job in self.jobs:
             if job.label in self.settings:
                 job.override_settings(self.settings[job.label])
+            job.global_options = self.global_options
             job.run()
 
 
@@ -158,7 +160,7 @@ class BuiltinJob(Job):
         self.fn = getattr(builtin, label[1:])
 
     def run(self):
-        self.fn(self.label, self.options, self.settings)
+        self.fn(self.label, self.options, self.settings, self.global_options)
 
 
 @click.command(
@@ -180,10 +182,12 @@ def cli(ctx, config, label):
             if isinstance(config[key], dict):
                 log.echo("\t%s", key)
         return
+    options = make_options(ctx)
     job = get_job(config, label)
 
     log.debug("Applying overrides from options")
-    job.override_settings(make_options(ctx))
+    job.override_settings(options)
+    job.global_options = options
     try:
         job.run()
     except ValueError as e:

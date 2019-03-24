@@ -1,16 +1,16 @@
 import re
 
 
-def ping(label, options, settings):
+def ping(label, options, settings, global_options):
     print(options.get("msg", "ping"), "pong!")
 
 
-def versionbump(label, options, settings):
+def versionbump(label, options, settings, global_options):
     level = (
         "major"
-        if options.get("major")
+        if global_options.get("major", options.get("major"))
         else "minor"
-        if options.get("minor")
+        if global_options.get("minor", options.get("minor"))
         else "bugfix"
     )
 
