@@ -9,9 +9,6 @@ command = "twine upload dist/*"
 [clean]
 command = "rm -f dist/*"
 
-[versionbump]
-command = "_versionbump"  # builtin!
-
 [commit]
 command = 'git add setup.py && git commit -am "Version bump ($(grep version setup.py | cut -f 2 -d\"))"'
 
@@ -19,4 +16,4 @@ command = 'git add setup.py && git commit -am "Version bump ($(grep version setu
 command = 'git push'
 
 [publish]
-command = ["versionbump", "commit", "push", "build", "upload", "clean"]
+command = ["_versionbump", "commit", "push", "build", "upload", "clean"]

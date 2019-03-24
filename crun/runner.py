@@ -48,12 +48,16 @@ def make_options(ctx):
 
 
 def get_job(config, label):
+    log.debug("Getting label %s", label)
     if label in config:
-        if isinstance(config[label], list):
+        if isinstance(config[label]["command"], list):
+            log.debug("Making new pipeline %s", label)
             return Pipeline(config, label)
         else:
+            log.debug("Making new config job %s", label)
             return ConfigJob(config, label)
     elif label.startswith("_"):
+        log.debug("Making new builtin job %s", label)
         return BuiltinJob(config, label)
     log.critical("No job called %s was found", label)
     sys.exit(3)
@@ -69,7 +73,7 @@ class Job:
 class Pipeline(Job):
     def __init__(self, config, label):
         super().__init__(config, label)
-        self.jobs = [get_job(config, lab) for lab in config[label]]
+        self.jobs = [get_job(config, lab) for lab in self.settings["command"]]
 
     def run(self):
         for job in self.jobs:
