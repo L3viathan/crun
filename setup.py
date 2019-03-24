@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="crun",
-    version="1.1.0",
+    version="1.2.0",
     install_requires=[
         "click",
         "colorful",
@@ -23,6 +23,7 @@ setup(
         "console_scripts": ["crun=crun.runner:cli"],
     },
 )
+
 
 
 
