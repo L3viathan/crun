@@ -13,7 +13,7 @@ command = "rm -f dist/*"
 command = "_versionbump"  # builtin!
 
 [commit]
-command = 'git add setup.py && git commit -am "Version bump $(grep version setup.py | cut -f 2 -d\")"'
+command = 'git add setup.py && git commit -am "Version bump ($(grep version setup.py | cut -f 2 -d\"))"'
 
 [push]
 command = 'git push'
