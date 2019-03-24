@@ -1,7 +1,7 @@
 default_command = "clean"
 
 [build]
-command = "python3 setup.py sdist"
+command = "python3 setup.py sdist >/dev/null 2>&1"
 
 [upload]
 command = "twine upload dist/*"
