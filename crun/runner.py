@@ -160,7 +160,9 @@ class BuiltinJob(Job):
         self.fn = getattr(builtin, label[1:])
 
     def run(self):
+        log.info("Running job %s", self.label)
         self.fn(self.label, self.options, self.settings, self.global_options)
+        log.info("Job %s finished", self.label)
 
 
 @click.command(
