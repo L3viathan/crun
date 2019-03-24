@@ -33,7 +33,8 @@ def get_options(command):
         log.debug("Adding options")
         return " {}".format(
             " ".join(
-                f"--{key}={val}" for (key, val) in command["options"].items()
+                (f"--{key}" if val is True else f"--{key}={val}")
+                for (key, val) in command["options"].items()
             )
         )
     else:
