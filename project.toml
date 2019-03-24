@@ -7,13 +7,16 @@ command = "python3 setup.py sdist"
 command = "twine upload dist/*"
 
 [clean]
-command = "rm dist/*"
+command = "rm -f dist/*"
 
 [versionbump]
-command = """cat setup.py | python3 -c 'for line in __import__("sys").stdin:__import__("sys").stdout.write(__import__("re").sub("version=\\"(.*?)\\"", lambda x: ("version=\\"" + ".".join(str(int(y)+1 if i==2 else int(y)) for i, y in enumerate(x.group(1).split("."))) + "\\""), line))' > setup.py.new && mv setup.py.new setup.py"""
+command = "_versionbump"  # builtin!
 
 [commit]
-command = 'git add setup.py && git commit -am "Version bump $(grep version setup.py | cut -f 2 -d\")" && git push'
+command = 'git add setup.py && git commit -am "Version bump $(grep version setup.py | cut -f 2 -d\")"'
+
+[push]
+command = 'git push'
 
 [publish]
-command = ["versionbump", "commit", "build", "upload", "clean"]
+command = ["versionbump", "commit", "push", "build", "upload", "clean"]

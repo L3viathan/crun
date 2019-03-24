@@ -6,6 +6,7 @@ import toml
 import colorful
 
 from .fanciness import log, click_verbosity, ColorfulCommand
+from . import builtin
 
 
 def run_pipeline(label, command, config):
@@ -41,10 +42,18 @@ def get_options(command):
         return ""
 
 
+def run_builtin(command, label, config):
+    fn = getattr(builtin, command["command"][1:])
+    fn(command, label, config)
+
+
 def run_command(label, config):
     command = get_command(label, config)
     if isinstance(command["command"], list):  # pipeline
         return run_pipeline(label, command, config)
+
+    if command["command"].startswith("_"):  # builtin
+        return run_builtin(command, label, config)
 
     env = get_environment(command)
     opts = get_options(command)
