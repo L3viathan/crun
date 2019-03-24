@@ -1,4 +1,4 @@
-default_command = "clean"
+default_job = "clean"
 
 [build]
 command = "python3 setup.py sdist >/dev/null 2>&1"
@@ -16,4 +16,4 @@ command = 'git add setup.py && git commit -am "Version bump ($(grep version setu
 command = 'git push'
 
 [publish]
-command = ["_versionbump", "commit", "push", "build", "upload", "clean"]
+pipeline = ["_versionbump", "commit", "push", "build", "upload", "clean"]

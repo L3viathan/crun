@@ -15,7 +15,7 @@ command = "echo hiii"
 venv = "venv"
 
 [train_and_eval]
-command = ["train", "eval"]
+pipeline = ["train", "eval"]
 
 [train_and_eval.train.environment]
 foo = "bat"
