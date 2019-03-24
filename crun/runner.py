@@ -24,7 +24,15 @@ def get_config(filename):
 
 
 def make_options(ctx):
+    def add_recursive(options, key, value):
+        if "." in key:
+            first, _, second = key.partition(".")
+            add_recursive(options.setdefault(first, {}), second, value)
+        else:
+            options[key] = value
+
     options = {}
+
     remaining = list(ctx.args)
     while remaining:
         option = remaining.pop(0)
@@ -43,7 +51,7 @@ def make_options(ctx):
                 # no next value or next value is an option -> we have a flag
                 value = True
 
-        options[option[2:]] = value
+        add_recursive(options, option[2:], value)
     return options
 
 
@@ -67,7 +75,20 @@ class Job:
     def __init__(self, config, label):
         self.label = label
         self.options = {}
+        self.env = {}
         self.settings = config[label] if label in config else {}
+
+    def override_settings(self, overrides):
+        log.debug(f"Overriding {self.label} settings with {overrides}")
+        def merge_settings(old, new):
+            for key in new:
+                if isinstance(old.get(key, None), dict):
+                    merge_settings(old[key], new[key])
+                else:
+                    old[key] = new[key]
+        merge_settings(self.settings, overrides)
+        self.options.update(self.settings.get("options", {}))
+        self.env.update(self.settings.get("environment", {}))
 
 
 class Pipeline(Job):
@@ -80,10 +101,10 @@ class Pipeline(Job):
             self.jobs.append(get_job(config, lab))
 
     def run(self):
+        log.info("Running pipeline %s", self.label)
         for job in self.jobs:
-            for opt in self.options:
-                if opt.startswith(f"{job.label}."):
-                    job.options[opt[len(job.label) + 1 :]] = self.options[opt]
+            if job.label in self.settings:
+                job.override_settings(self.settings[job.label])
             job.run()
 
 
@@ -96,7 +117,10 @@ class ConfigJob(Job):
         }
         self.env = os.environ.copy()
         self.env.update(
-            {key: val for key, val in self.settings.get("environment", {}).items()}
+            {
+                key: val
+                for key, val in self.settings.get("environment", {}).items()
+            }
         )
 
     def bake_options(self):
@@ -132,6 +156,7 @@ class BuiltinJob(Job):
     def __init__(self, config, label):
         super().__init__(config, label[1:])
         self.fn = getattr(builtin, label[1:])
+
     def run(self):
         self.fn(self.label, self.options, self.settings)
 
@@ -158,7 +183,7 @@ def cli(ctx, config, label):
     job = get_job(config, label)
 
     log.debug("Applying overrides from options")
-    job.options.update(make_options(ctx))
+    job.override_settings(make_options(ctx))
     try:
         job.run()
     except ValueError as e:
