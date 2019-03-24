@@ -89,12 +89,10 @@ log = LogColorizer()
 
 
 def _set_verbosity(_, __, val):
-    if val > 1:
+    if val >= 1:
         logger.setLevel(logging.DEBUG)
-    elif val:
-        logger.setLevel(logging.INFO)
     else:
-        logger.setLevel(logging.WARNING)
+        logger.setLevel(logging.INFO)
 
 
 def click_verbosity(fn, pass_through=False):
