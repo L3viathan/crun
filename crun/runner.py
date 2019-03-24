@@ -125,7 +125,7 @@ class ConfigJob(Job):
 
 class BuiltinJob(Job):
     def __init__(self, config, label):
-        super().__init__(config, label)
+        super().__init__(config, label[1:])
         self.fn = getattr(builtin, label[1:])
     def run(self):
         self.fn(self.label, self.options, self.settings)
