@@ -44,7 +44,9 @@ def get_options(command):
 
 def run_builtin(command, label, config):
     fn = getattr(builtin, command["command"][1:])
+    log.info("Running builtin %s", label)
     fn(command, label, config)
+    log.info("Builtin %s finished", label)
 
 
 def run_command(label, config):
