@@ -6,7 +6,6 @@ logging.basicConfig(
     style="{",
     format="{} {} {}".format(colorful.green("{asctime}"), "›", "{message}"),
     datefmt="%H:%M:%S",
-    # level=logging.DEBUG,
 )
 logger = logging.getLogger("runner")
 
@@ -24,7 +23,7 @@ class ColorfulCommand(click.Command):
     def get_usage(self, ctx):
         formatter = self.make_formatter(ctx)
         self.format_usage(ctx, formatter)
-        return formatter.getvalue().rstrip('\n')
+        return formatter.getvalue().rstrip("\n")
 
     def get_help(self, ctx):
         formatter = self.make_formatter(ctx)
@@ -40,9 +39,7 @@ class ColorfulCommand(click.Command):
 class ColoredHelpFormatter(click.HelpFormatter):
     def write_usage(self, prog, args="", prefix="Usage: "):
         return super().write_usage(
-            colorful.white(prog),
-            args=args,
-            prefix=colorful.green(prefix),
+            colorful.white(prog), args=args, prefix=colorful.green(prefix)
         )
 
     def write_heading(self, heading):
@@ -82,24 +79,42 @@ class LogColorizer:
         return wrapper
 
     def echo(self, message, *args):
-        print(str(colorful.cyan(message)) % tuple(colorful.white(arg) for arg in args))
+        print(
+            str(colorful.cyan(message))
+            % tuple(colorful.white(arg) for arg in args)
+        )
 
 
 log = LogColorizer()
 
 
-def _set_verbosity(_, __, val):
-    if val >= 1:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
+def _set_verbosity(_, arg, val):
+    if val:
+        current = logger.getEffectiveLevel()
+        if arg.name == "verbose":
+            logger.setLevel(current - val * 10)
+        elif arg.name == "quiet":
+            logger.setLevel(current + val * 10)
 
 
-def click_verbosity(fn, pass_through=False):
-    return click.option(
-        "--verbose",
-        "-v",
-        count=True,
-        callback=_set_verbosity,
-        expose_value=pass_through,
-    )(fn)
+def click_verbosity(pass_through=False, level=logging.INFO):
+    logger.setLevel(level)
+
+    def wrapper(fn):
+        return click.option(
+            "--verbose",
+            "-v",
+            count=True,
+            callback=_set_verbosity,
+            expose_value=pass_through,
+        )(
+            click.option(
+                "--quiet",
+                "-q",
+                count=True,
+                callback=_set_verbosity,
+                expose_value=pass_through,
+            )(fn)
+        )
+
+    return wrapper

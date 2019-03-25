@@ -170,7 +170,7 @@ class BuiltinJob(Job):
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
-@click_verbosity
+@click_verbosity()
 @click.argument("label", type=str, required=False)
 @click.pass_context
 def cli(ctx, config, label):
