@@ -1,6 +1,8 @@
 import os
 import sys
 import subprocess
+from pathlib import Path
+
 import click
 import toml
 import colorful
@@ -10,11 +12,16 @@ from . import builtin
 
 
 def get_config(filename):
+    cwd = Path.cwd()
+    while not (cwd / filename).exists():
+        if cwd.parent == cwd:
+            break  # stop at the root
+        cwd = cwd.parent
     try:
-        with open(filename) as f:
+        with open(cwd / filename) as f:
             data = toml.load(f)
             if "base" in data:
-                data = {**get_config(data["base"]), **data}
+                data = {**get_config(cwd / data["base"]), **data}
         return data
     except FileNotFoundError:
         raise click.BadOptionUsage(
