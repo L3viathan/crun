@@ -12,6 +12,15 @@ from . import builtin
 
 
 def get_config(filename):
+    def recursive_merge(old, new):
+        d = old.copy()
+        for key in new:
+            if key in d and isinstance(d[key], dict):
+                d[key] = recursive_merge(d[key], new[key])
+            else:
+                d[key] = new[key]
+        return d
+
     cwd = Path.cwd()
     while not (cwd / filename).exists():
         if cwd.parent == cwd:
@@ -21,7 +30,7 @@ def get_config(filename):
         with open(cwd / filename) as f:
             data = toml.load(f)
             if "base" in data:
-                data = {**get_config(cwd / data["base"]), **data}
+                data = recursive_merge(get_config(cwd / data["base"]), data)
         return data
     except FileNotFoundError:
         raise click.BadOptionUsage(
@@ -96,12 +105,14 @@ class Job:
 
     def override_settings(self, overrides):
         log.debug(f"Overriding {self.label} settings with {overrides}")
+
         def merge_settings(old, new):
             for key in new:
                 if isinstance(old.get(key, None), dict):
                     merge_settings(old[key], new[key])
                 else:
                     old[key] = new[key]
+
         merge_settings(self.settings, overrides)
         self.options.update(self.settings.get("options", {}))
         self.env.update(self.settings.get("environment", {}))
