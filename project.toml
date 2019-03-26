@@ -17,3 +17,4 @@ command = 'git push'
 
 [publish]
 pipeline = ["_versionbump", "commit", "push", "build", "upload", "clean"]
+aliases = ["p"]
