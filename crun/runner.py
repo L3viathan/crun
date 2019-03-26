@@ -64,6 +64,14 @@ def make_options(ctx):
 
 def get_job(config, label):
     log.debug("Getting label %s", label)
+    aliases = {
+        alias: label
+        for label in config
+        if isinstance(config[label], dict)
+        for alias in config[label].get("aliases", [])
+    }
+    if label in aliases:
+        label = aliases[label]
     if label in config:
         if "pipeline" in config[label]:
             log.debug("Making new pipeline %s", label)
