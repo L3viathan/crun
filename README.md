@@ -1,0 +1,43 @@
+# crun
+
+crun (*c*‌onfig *run*‌er) is a tool that lets you define jobs and pipelines consisting of several jobs in a config file, and then run them. Jobs can have commands associated with them, that can be run with custom options and environment variables, both of which can come either from the config file, or interactively when calling crun.
+
+## Installation
+
+    pip install crun
+
+## Configuring
+
+The configuration language is [TOML](https://github.com/toml-lang/toml), a very simple and straightforward language inspired by classic INI files. By default, `crun` looks for a file called `project.toml` in the current directory, but it can be told where to look with the `--config` switch.
+
+Crun jobs are defined by defining toml tables (i.e. dictionaries, maps, objects):
+
+    [step1]
+    command = "echo step 1"
+
+    [step2]
+    command = "echo step 2"
+
+Running `crun step2` with this configuration file will cause `step 2` to be printed.
+
+## Options and the environment
+
+Let's look at another example:
+
+    [list]
+    command = "exa"
+    [list.options]
+    tree = true
+
+Calling the job `crun list` will now start exa with the `--list` switch set. If you set it to a value other than true or false, that value will be given as the value of the option, rather than treating it as a flag.
+
+The same can be done with the `[list.environment]` table, except that it sets environment variables instead of command line switches.
+
+
+## Inheritance and overriding
+
+Until now, `crun` seems barely more useful than a shell alias or function. I hope that changes with this section.
+
+At the top level of the configuration file, you can define meta settings. One of these is `base` which marks the config file a derivative of a different file. That way you can define jobs once, but override options in small, dependent files.
+
+It is also possible to override ...
