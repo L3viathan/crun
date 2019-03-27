@@ -33,7 +33,7 @@ def get_config(filename):
                 data = recursive_merge(
                     get_config((cwd / filename).parent / data["base"]), data
                 )
-            os.chdir((cwd/filename).parent)
+            os.chdir((cwd / filename).parent)
         return data
     except FileNotFoundError:
         raise click.BadOptionUsage(
@@ -74,8 +74,8 @@ def make_options(ctx):
     return options
 
 
-def get_job(config, label):
-    log.debug("Getting label %s", label)
+def get_job(config, label, indent=0):
+    log.debug("Getting label %s", label, indent=indent)
     aliases = {
         alias: label
         for label in config
@@ -86,28 +86,33 @@ def get_job(config, label):
         label = aliases[label]
     if label in config:
         if "pipeline" in config[label]:
-            log.debug("Making new pipeline %s", label)
-            return Pipeline(config, label)
+            log.debug("Making new pipeline %s", label, indent=indent)
+            return Pipeline(config, label, indent)
         else:
-            log.debug("Making new config job %s", label)
-            return ConfigJob(config, label)
+            log.debug("Making new config job %s", label, indent=indent)
+            return ConfigJob(config, label, indent)
     elif label.startswith("_"):
-        log.debug("Making new builtin job %s", label)
-        return BuiltinJob(config, label)
-    log.critical("No job called %s was found", label)
+        log.debug("Making new builtin job %s", label, indent=indent)
+        return BuiltinJob(config, label, indent)
+    log.critical("No job called %s was found", label, indent=indent)
     sys.exit(3)
 
 
 class Job:
-    def __init__(self, config, label):
+    def __init__(self, config, label, indent):
         self.label = label
         self.options = {}
         self.env = {}
         self.global_options = {}
         self.settings = config[label] if label in config else {}
+        self.config = config
+        self.indent = indent
 
     def override_settings(self, overrides):
-        log.debug(f"Overriding {self.label} settings with {overrides}")
+        log.debug(
+            f"Overriding {self.label} settings with {overrides}",
+            indent=self.indent,
+        )
 
         def merge_settings(old, new):
             for key in new:
@@ -122,16 +127,16 @@ class Job:
 
 
 class Pipeline(Job):
-    def __init__(self, config, label):
-        super().__init__(config, label)
+    def __init__(self, config, label, indent):
+        super().__init__(config, label, indent)
         self.jobs = []
         for lab in self.settings["pipeline"]:
             if lab in self.settings:
                 config[lab].update(self.settings[lab])
-            self.jobs.append(get_job(config, lab))
+            self.jobs.append(get_job(config, lab, self.indent + 1))
 
     def run(self):
-        log.info("Running pipeline %s", self.label)
+        log.info("Running pipeline %s", self.label, indent=self.indent)
         for job in self.jobs:
             if job.label in self.settings:
                 job.override_settings(self.settings[job.label])
@@ -140,8 +145,8 @@ class Pipeline(Job):
 
 
 class ConfigJob(Job):
-    def __init__(self, config, label):
-        super().__init__(config, label)
+    def __init__(self, config, label, indent):
+        super().__init__(config, label, indent)
         self.cmd = self.settings["command"]
         self.options = {
             key: val for key, val in self.settings.get("options", {}).items()
@@ -166,32 +171,68 @@ class ConfigJob(Job):
         else:
             return ""
 
+    @property
+    def should_run(self):
+        job = None
+        if "run_if" in self.settings:
+            job = get_job(self.config, self.settings["run_if"], self.indent + 1)
+            should_fail = False
+        if "run_unless" in self.settings:
+            job = get_job(
+                self.config, self.settings["run_unless"], self.indent + 1
+            )
+            should_fail = True
+        if not job:
+            return None
+        log.info("Checking preconditions of job %s", self.label, indent=self.indent)
+        try:
+            job.run()
+        except subprocess.CalledProcessError:
+            return should_fail
+        return not should_fail
+
     def run(self):
+        precondition = self.should_run
+        if precondition is False:
+            return log.info(
+                "Skipping job %s due to precondition",
+                self.label,
+                indent=self.indent,
+            )
+        elif precondition is True:
+            return log.info(
+                "Running job %s due to precondition",
+                self.label,
+                indent=self.indent,
+            )
         cmd = "{}{}".format(self.cmd, self.bake_options())
-        log.info("Running job %s", self.label)
+        log.info("Running job %s", self.label, indent=self.indent)
         try:
             subprocess.run(cmd, env=self.env, shell=True, check=True)
-            return log.info("Job %s finished", self.label)
+            return log.info("Job %s finished", self.label, indent=self.indent)
         except subprocess.CalledProcessError as e:
             if self.settings.get("fail_ok", False):
-                return log.info("Job %s finished", self.label)
+                return log.info(
+                    "Job %s finished", self.label, indent=self.indent
+                )
             log.error(
                 "Job %s returned with non-zero exit code %s",
                 self.label,
                 e.returncode,
+                indent=self.indent,
             )
             raise e
 
 
 class BuiltinJob(Job):
-    def __init__(self, config, label):
-        super().__init__(config, label[1:])
+    def __init__(self, config, label, indent):
+        super().__init__(config, label[1:], indent)
         self.fn = getattr(builtin, label[1:])
 
     def run(self):
-        log.info("Running job %s", self.label)
+        log.info("Running job %s", self.label, indent=self.indent)
         self.fn(self.label, self.options, self.settings, self.global_options)
-        log.info("Job %s finished", self.label)
+        log.info("Job %s finished", self.label, indent=self.indent)
 
 
 @click.command(

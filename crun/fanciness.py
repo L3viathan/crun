@@ -4,7 +4,7 @@ import colorful
 
 logging.basicConfig(
     style="{",
-    format="{} {} {}".format(colorful.green("{asctime}"), "›", "{message}"),
+    format="{} {}".format(colorful.green("{asctime}"), "{message}"),
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("runner")
@@ -70,9 +70,9 @@ class LogColorizer:
         """
         log_color = COLORS[attr]
 
-        def wrapper(message, *args):
+        def wrapper(message, *args, indent=0):
             return getattr(logger, attr)(
-                log_color(message),
+                "{}› {}".format(" " * indent, log_color(message)),
                 *(self.arg_wrapper(log_color, arg) for arg in args)
             )
 
