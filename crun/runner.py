@@ -33,6 +33,7 @@ def get_config(filename):
                 data = recursive_merge(
                     get_config((cwd / filename).parent / data["base"]), data
                 )
+            os.chdir((cwd/filename).parent)
         return data
     except FileNotFoundError:
         raise click.BadOptionUsage(
