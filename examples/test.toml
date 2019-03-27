@@ -11,4 +11,4 @@ command="true"
 command="echo hello"
 
 [test]
-command=["succeed", "fail", "hello"]
+pipeline=["succeed", "fail", "hello"]
