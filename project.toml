@@ -1,5 +1,3 @@
-default_job = "clean"
-
 [build]
 command = "python3 setup.py sdist >/dev/null 2>&1"
 
@@ -16,8 +14,11 @@ command = 'git add setup.py && git commit -am "Version bump ($(grep version setu
 command = 'git tag $(grep version setup.py | cut -f 2 -d\")'
 
 [push]
-command = 'git push --follow-tags'
+command = 'git push'
+
+[pushtags]
+command = 'git push'
 
 [publish]
-pipeline = ["_versionbump", "commit", "tag", "push", "build", "upload", "clean"]
+pipeline = ["_versionbump", "commit", "tag", "push", "pushtags", "build", "upload", "clean"]
 aliases = ["p"]
