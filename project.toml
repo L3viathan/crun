@@ -12,9 +12,12 @@ command = "rm -f dist/*"
 [commit]
 command = 'git add setup.py && git commit -am "Version bump ($(grep version setup.py | cut -f 2 -d\"))"'
 
+[tag]
+command = 'git tag $(grep version setup.py | cut -f 2 -d\")'
+
 [push]
-command = 'git push'
+command = 'git push --tags'
 
 [publish]
-pipeline = ["_versionbump", "commit", "push", "build", "upload", "clean"]
+pipeline = ["_versionbump", "commit", "tag", "push", "build", "upload", "clean"]
 aliases = ["p"]
