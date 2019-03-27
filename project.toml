@@ -16,7 +16,7 @@ command = 'git add setup.py && git commit -am "Version bump ($(grep version setu
 command = 'git tag $(grep version setup.py | cut -f 2 -d\")'
 
 [push]
-command = 'git push --tags'
+command = 'git push --follow-tags'
 
 [publish]
 pipeline = ["_versionbump", "commit", "tag", "push", "build", "upload", "clean"]
