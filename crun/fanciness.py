@@ -72,7 +72,7 @@ class LogColorizer:
 
         def wrapper(message, *args, indent=0):
             return getattr(logger, attr)(
-                "{}› {}".format(" " * indent, log_color(message)),
+                "{}› {}".format("  " * indent, log_color(message)),
                 *(self.arg_wrapper(log_color, arg) for arg in args)
             )
 

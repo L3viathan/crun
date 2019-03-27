@@ -125,6 +125,40 @@ class Job:
         self.options.update(self.settings.get("options", {}))
         self.env.update(self.settings.get("environment", {}))
 
+    @property
+    def should_run(self):
+        job = None
+        if "run_if" in self.settings:
+            job = get_job(self.config, self.settings["run_if"], self.indent + 1)
+            should_fail = False
+        if "run_unless" in self.settings:
+            job = get_job(
+                self.config, self.settings["run_unless"], self.indent + 1
+            )
+            should_fail = True
+        if not job:
+            return None
+        log.info("Checking preconditions of job %s", self.label, indent=self.indent)
+        try:
+            job.run()
+        except subprocess.CalledProcessError:
+            return should_fail
+        return not should_fail
+
+    def run(self):
+        precondition = self.should_run
+        if precondition is False:
+            log.info(
+                "Skipping job %s due to precondition",
+                self.label,
+                indent=self.indent,
+            )
+        else:
+            self.execute()
+
+    def execute(self):
+        raise NotImplementedError()
+
 
 class Pipeline(Job):
     def __init__(self, config, label, indent):
@@ -135,13 +169,14 @@ class Pipeline(Job):
                 config[lab].update(self.settings[lab])
             self.jobs.append(get_job(config, lab, self.indent + 1))
 
-    def run(self):
+    def execute(self):
         log.info("Running pipeline %s", self.label, indent=self.indent)
         for job in self.jobs:
             if job.label in self.settings:
                 job.override_settings(self.settings[job.label])
             job.global_options = self.global_options
             job.run()
+        log.info("Pipeline %s finished", self.label, indent=self.indent)
 
 
 class ConfigJob(Job):
@@ -171,40 +206,7 @@ class ConfigJob(Job):
         else:
             return ""
 
-    @property
-    def should_run(self):
-        job = None
-        if "run_if" in self.settings:
-            job = get_job(self.config, self.settings["run_if"], self.indent + 1)
-            should_fail = False
-        if "run_unless" in self.settings:
-            job = get_job(
-                self.config, self.settings["run_unless"], self.indent + 1
-            )
-            should_fail = True
-        if not job:
-            return None
-        log.info("Checking preconditions of job %s", self.label, indent=self.indent)
-        try:
-            job.run()
-        except subprocess.CalledProcessError:
-            return should_fail
-        return not should_fail
-
-    def run(self):
-        precondition = self.should_run
-        if precondition is False:
-            return log.info(
-                "Skipping job %s due to precondition",
-                self.label,
-                indent=self.indent,
-            )
-        elif precondition is True:
-            return log.info(
-                "Running job %s due to precondition",
-                self.label,
-                indent=self.indent,
-            )
+    def execute(self):
         cmd = "{}{}".format(self.cmd, self.bake_options())
         log.info("Running job %s", self.label, indent=self.indent)
         try:
@@ -229,7 +231,7 @@ class BuiltinJob(Job):
         super().__init__(config, label[1:], indent)
         self.fn = getattr(builtin, label[1:])
 
-    def run(self):
+    def execute(self):
         log.info("Running job %s", self.label, indent=self.indent)
         self.fn(self.label, self.options, self.settings, self.global_options)
         log.info("Job %s finished", self.label, indent=self.indent)
