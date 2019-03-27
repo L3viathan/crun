@@ -30,7 +30,9 @@ def get_config(filename):
         with open(cwd / filename) as f:
             data = toml.load(f)
             if "base" in data:
-                data = recursive_merge(get_config(cwd / data["base"]), data)
+                data = recursive_merge(
+                    get_config((cwd / filename).parent / data["base"]), data
+                )
         return data
     except FileNotFoundError:
         raise click.BadOptionUsage(
