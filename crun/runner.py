@@ -52,11 +52,16 @@ def make_options(ctx):
 
     options = {}
 
+    positional = []
     remaining = list(ctx.args)
     while remaining:
         option = remaining.pop(0)
+        if option == "--":
+            positional.extend(remaining)
+            break
         if not option.startswith("--"):  # only options are allowed
-            raise click.BadParameter(option)
+            positional.append(option)
+            continue
         if "=" in option:
             option, value = option.split("=", maxsplit=1)
         else:
@@ -71,10 +76,10 @@ def make_options(ctx):
                 value = True
 
         add_recursive(options, option[2:], value)
-    return options
+    return options, positional
 
 
-def get_job(config, label, indent=0):
+def get_job(config, label, indent=0, parent=None):
     log.debug("Getting label %s", label, indent=indent)
     aliases = {
         alias: label
@@ -87,26 +92,50 @@ def get_job(config, label, indent=0):
     if label in config:
         if "pipeline" in config[label]:
             log.debug("Making new pipeline %s", label, indent=indent)
-            return Pipeline(config, label, indent)
+            return Pipeline(config, label, indent, parent)
         else:
             log.debug("Making new config job %s", label, indent=indent)
-            return ConfigJob(config, label, indent)
+            return ConfigJob(config, label, indent, parent)
     elif label.startswith("_"):
         log.debug("Making new builtin job %s", label, indent=indent)
-        return BuiltinJob(config, label, indent)
+        return BuiltinJob(config, label, indent, parent)
     log.critical("No job called %s was found", label, indent=indent)
     sys.exit(3)
 
 
 class Job:
-    def __init__(self, config, label, indent):
+    def __init__(self, config, label, indent, parent):
         self.label = label
         self.options = {}
         self.env = {}
-        self.global_options = {}
         self.settings = config[label] if label in config else {}
         self.config = config
         self.indent = indent
+        self.parent = parent
+
+    @property
+    def positional(self):
+        if self.parent:
+            return self.parent.positional
+        return self._positional
+
+    @positional.setter
+    def positional(self, value):
+        if self.parent:
+            raise RuntimeError("Can only set positional arguments on root.")
+        self._positional = value
+
+    @property
+    def global_options(self):
+        if self.parent:
+            return self.parent.global_options
+        return self._global_options
+
+    @global_options.setter
+    def global_options(self, value):
+        if self.parent:
+            raise RuntimeError("Can only set global_options on root.")
+        self._global_options = value
 
     def override_settings(self, overrides):
         log.debug(
@@ -129,16 +158,20 @@ class Job:
     def should_run(self):
         job = None
         if "run_if" in self.settings:
-            job = get_job(self.config, self.settings["run_if"], self.indent + 1)
+            job = get_job(
+                self.config, self.settings["run_if"], self.indent + 1, self
+            )
             should_fail = False
         if "run_unless" in self.settings:
             job = get_job(
-                self.config, self.settings["run_unless"], self.indent + 1
+                self.config, self.settings["run_unless"], self.indent + 1, self
             )
             should_fail = True
         if not job:
             return None
-        log.info("Checking preconditions of job %s", self.label, indent=self.indent)
+        log.info(
+            "Checking preconditions of job %s", self.label, indent=self.indent
+        )
         try:
             job.run()
         except subprocess.CalledProcessError:
@@ -161,27 +194,26 @@ class Job:
 
 
 class Pipeline(Job):
-    def __init__(self, config, label, indent):
-        super().__init__(config, label, indent)
+    def __init__(self, config, label, indent, parent):
+        super().__init__(config, label, indent, parent)
         self.jobs = []
         for lab in self.settings["pipeline"]:
             if lab in self.settings:
                 config[lab].update(self.settings[lab])
-            self.jobs.append(get_job(config, lab, self.indent + 1))
+            self.jobs.append(get_job(config, lab, self.indent + 1, self))
 
     def execute(self):
         log.info("Running pipeline %s", self.label, indent=self.indent)
         for job in self.jobs:
             if job.label in self.settings:
                 job.override_settings(self.settings[job.label])
-            job.global_options = self.global_options
             job.run()
         log.info("Pipeline %s finished", self.label, indent=self.indent)
 
 
 class ConfigJob(Job):
-    def __init__(self, config, label, indent):
-        super().__init__(config, label, indent)
+    def __init__(self, config, label, indent, parent):
+        super().__init__(config, label, indent, parent)
         self.cmd = self.settings["command"]
         self.options = {
             key: val for key, val in self.settings.get("options", {}).items()
@@ -207,7 +239,9 @@ class ConfigJob(Job):
             return ""
 
     def execute(self):
-        cmd = "{}{}".format(self.cmd, self.bake_options())
+        cmd = "{}{}".format(
+            self.cmd.format(*self.positional, **self.env), self.bake_options()
+        )
         log.info("Running job %s", self.label, indent=self.indent)
         try:
             subprocess.run(cmd, env=self.env, shell=True, check=True)
@@ -227,8 +261,8 @@ class ConfigJob(Job):
 
 
 class BuiltinJob(Job):
-    def __init__(self, config, label, indent):
-        super().__init__(config, label[1:], indent)
+    def __init__(self, config, label, indent, parent):
+        super().__init__(config, label[1:], indent, parent)
         self.fn = getattr(builtin, label[1:])
 
     def execute(self):
@@ -256,12 +290,13 @@ def cli(ctx, config, label):
             if isinstance(config[key], dict):
                 log.echo("\t%s", key)
         return
-    options = make_options(ctx)
+    options, positional = make_options(ctx)
     job = get_job(config, label)
 
     log.debug("Applying overrides from options")
     job.override_settings(options)
     job.global_options = options
+    job.positional = positional
     try:
         job.run()
     except ValueError as e:
