@@ -11,6 +11,13 @@ from .fanciness import log, click_verbosity, ColorfulCommand
 from . import builtin
 
 
+class AttrDict(dict):
+    def __getattr__(self, attr):
+        if isinstance(self[attr], dict):
+            return AttrDict(self[attr])
+        return self[attr]
+
+
 def get_config(filename):
     def recursive_merge(old, new):
         d = old.copy()
@@ -239,9 +246,29 @@ class ConfigJob(Job):
             return ""
 
     def execute(self):
-        cmd = "{}{}".format(
-            self.cmd.format(*self.positional, **self.env), self.bake_options()
-        )
+        try:
+            cmd = "{}{}".format(
+                self.cmd.format(
+                    *self.positional,
+                    **AttrDict(
+                        {
+                            **self.settings,
+                            **{
+                                f"${key}": value
+                                for key, value in self.env.items()
+                            },
+                        }
+                    ),
+                ),
+                self.bake_options(),
+            )
+        except KeyError as e:
+            log.critical(
+                "Can't interpolate %s in command of job %s",
+                e.args[0],
+                self.label,
+            )
+            sys.exit(4)
         log.info("Running job %s", self.label, indent=self.indent)
         try:
             subprocess.run(cmd, env=self.env, shell=True, check=True)
