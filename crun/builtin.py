@@ -29,7 +29,7 @@ def versionbump(label, options, settings, global_options):
     with open("setup.py") as f:
         old = f.read()
     with open("setup.py", "w") as f:
-        for line in old.split("\n"):
+        for line in old.strip().split("\n"):
             if "version" not in line:
                 f.write(line)
             else:
