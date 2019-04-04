@@ -1,6 +1,6 @@
 # crun
 
-crun (*c*‌onfig *run*‌er) is a tool that lets you define jobs and pipelines consisting of several jobs in a config file, and then run them. Jobs can have commands associated with them, that can be run with custom options and environment variables, both of which can come either from the config file, or interactively when calling crun.
+crun (*c*‌onfig *run*‌ner) is a tool that lets you define jobs and pipelines consisting of several jobs in a config file, and then run them. Jobs can have commands associated with them, that can be run with custom options and environment variables, both of which can come either from the config file, or interactively when calling crun.
 
 ## Installation
 
