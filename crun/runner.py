@@ -260,6 +260,7 @@ class ConfigJob(Job):
                         f"#{i+1}": value
                         for i, value in enumerate(self.positional)
                     },
+                    **{"#0": " ".join(self.positional)},
                 ),
                 self.bake_options(),
             )
