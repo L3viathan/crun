@@ -47,7 +47,7 @@ It is also possible to override any settings using command-line switches: If, sa
 Sometimes, a command needs more parametrization than just options. For this reason, _interpolation_ exists: Any command can use Python's new-style string formatting syntax to automatically fill in remaining arguments, environment variables, or any settings:
 
     [foo]
-    command = "echo {$HOME} {} {} {bar}"
+    command = "echo {$HOME} {#1} {#2} {bar}"
 
 Executing `crun foo --bar=bat spam ham` prints "/Users/l3viathan spam ham bat" on my machine.
 
