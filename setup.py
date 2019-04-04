@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="crun",
-    version="2.5.0",
+    version="2.6.0",
     install_requires=[
         "click",
         "colorful",
