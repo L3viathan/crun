@@ -249,13 +249,8 @@ class ConfigJob(Job):
         try:
             cmd = "{}{}".format(
                 self.cmd.format(
-                    **AttrDict(
-                        self.settings,
-                    ),
-                    **{
-                        f"${key}": value
-                        for key, value in self.env.items()
-                    },
+                    **AttrDict(self.settings),
+                    **{f"${key}": value for key, value in self.env.items()},
                     **{
                         f"#{i+1}": value
                         for i, value in enumerate(self.positional)
@@ -325,7 +320,13 @@ def cli(ctx, config, label):
         log.echo("Available jobs:")
         for key in config:
             if isinstance(config[key], dict):
-                log.echo("\t%s", key)
+                aliases = config[key].get("aliases")
+                alias_str = (
+                    colorful.gray(" ({})".format(", ".join(aliases)))
+                    if aliases
+                    else ""
+                )
+                log.echo("\t%s%s", key, alias_str)
         return
     options, positional = make_options(ctx)
     job = get_job(config, label)
