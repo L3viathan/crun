@@ -249,16 +249,17 @@ class ConfigJob(Job):
         try:
             cmd = "{}{}".format(
                 self.cmd.format(
-                    *self.positional,
                     **AttrDict(
-                        {
-                            **self.settings,
-                            **{
-                                f"${key}": value
-                                for key, value in self.env.items()
-                            },
-                        }
+                        self.settings,
                     ),
+                    **{
+                        f"${key}": value
+                        for key, value in self.env.items()
+                    },
+                    **{
+                        f"#{i+1}": value
+                        for i, value in enumerate(self.positional)
+                    },
                 ),
                 self.bake_options(),
             )
@@ -269,6 +270,14 @@ class ConfigJob(Job):
                 self.label,
             )
             sys.exit(4)
+        except IndexError as e:
+            assert e.args[0] == "tuple index out of range"
+            log.critical(
+                "Broken config in job %s: Don't use {braces} that are empty or contain numbers",
+                self.label,
+            )
+            sys.exit(5)
+
         log.info("Running job %s", self.label, indent=self.indent)
         try:
             subprocess.run(cmd, env=self.env, shell=True, check=True)
