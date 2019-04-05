@@ -45,7 +45,9 @@ def get_config(filename):
     except FileNotFoundError:
         raise click.BadOptionUsage(
             option_name="--config",
-            message=color_wrap("red", f"Configuration file {filename} not found."),
+            message=color_wrap(
+                "red", f"Configuration file {filename} not found."
+            ),
         )
 
 
@@ -289,7 +291,10 @@ class ConfigJob(Job):
         log.info("Running job %s", self.label, indent=self.indent)
         try:
             log.debug("Running command %s", cmd, indent=self.indent)
-            subprocess.run(cmd, env=self.env, shell=True, check=True)
+            res = subprocess.run(
+                cmd, env=self.env, shell=True, check=True, **self.sp_kwargs
+            )
+            self.write_output(res)
             return log.info("Job %s finished", self.label, indent=self.indent)
         except subprocess.CalledProcessError as e:
             if self.settings.get("fail_ok", False):
@@ -303,6 +308,22 @@ class ConfigJob(Job):
                 indent=self.indent,
             )
             raise e
+
+    @property
+    def sp_kwargs(self):
+        return {
+            stream: subprocess.PIPE
+            for stream in ["stdout", "stderr"]
+            if stream in self.settings
+        }
+
+    def write_output(self, res):
+        for stream in ["stdout", "stderr"]:
+            filename = self.settings.get(stream)
+            if not filename:
+                continue
+            with open(filename, "wb") as f:
+                f.write(getattr(res, stream))
 
 
 class BuiltinJob(Job):
