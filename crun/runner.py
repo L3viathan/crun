@@ -18,16 +18,17 @@ class AttrDict(dict):
         return self[attr]
 
 
-def get_config(filename):
-    def recursive_merge(old, new):
-        d = old.copy()
-        for key in new:
-            if key in d and isinstance(d[key], dict):
-                d[key] = recursive_merge(d[key], new[key])
-            else:
-                d[key] = new[key]
-        return d
+def recursive_merge(old, new):
+    d = old.copy()
+    for key in new:
+        if key in d and isinstance(d[key], dict):
+            d[key] = recursive_merge(d[key], new[key])
+        else:
+            d[key] = new[key]
+    return d
 
+
+def get_config(filename):
     cwd = Path.cwd()
     while not (cwd / filename).exists():
         if cwd.parent == cwd:
@@ -87,7 +88,19 @@ def make_options(ctx):
 
 
 def get_job(config, label, indent=0, parent=None):
+
     log.debug("Getting label %s", label, indent=indent)
+
+    if "base" in config.get(label, ""):
+        base = config[label]["base"]
+        assert base in config and isinstance(
+            config[base], dict
+        ), "base needs to be a defined job"
+
+        base_dict = config[base].copy()  # shallow, only for popping aliases
+        base_dict.pop("alias", None)
+        config[label] = recursive_merge(base_dict, config[label])
+
     aliases = {
         alias: label
         for label in config
@@ -145,17 +158,16 @@ class Job:
         self._global_options = value
 
     def override_settings(self, overrides):
-        log.debug(
-            f"Overriding {self.label} settings with {overrides}",
-            indent=self.indent,
-        )
-
         def merge_settings(old, new):
             for key in new:
                 if isinstance(old.get(key, None), dict):
                     merge_settings(old[key], new[key])
                 else:
                     old[key] = new[key]
+        log.debug(
+            f"Overriding {self.label} settings with {overrides}",
+            indent=self.indent,
+        )
 
         merge_settings(self.settings, overrides)
         self.options.update(self.settings.get("options", {}))
@@ -276,6 +288,7 @@ class ConfigJob(Job):
 
         log.info("Running job %s", self.label, indent=self.indent)
         try:
+            log.debug("Running command %s", cmd, indent=self.indent)
             subprocess.run(cmd, env=self.env, shell=True, check=True)
             return log.info("Job %s finished", self.label, indent=self.indent)
         except subprocess.CalledProcessError as e:
