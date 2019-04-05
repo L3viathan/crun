@@ -5,9 +5,8 @@ from pathlib import Path
 
 import click
 import toml
-import colorful
 
-from .fanciness import log, click_verbosity, ColorfulCommand
+from .fanciness import log, click_verbosity, ColorfulCommand, color_wrap, setup
 from . import builtin
 
 
@@ -46,7 +45,7 @@ def get_config(filename):
     except FileNotFoundError:
         raise click.BadOptionUsage(
             option_name="--config",
-            message=colorful.red(f"Configuration file {filename} not found."),
+            message=color_wrap("red", f"Configuration file {filename} not found."),
         )
 
 
@@ -164,6 +163,7 @@ class Job:
                     merge_settings(old[key], new[key])
                 else:
                     old[key] = new[key]
+
         log.debug(
             f"Overriding {self.label} settings with {overrides}",
             indent=self.indent,
@@ -321,10 +321,14 @@ class BuiltinJob(Job):
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
+@click.option(
+    "--color", type=click.Choice(["always", "auto", "never"]), default="auto"
+)
 @click_verbosity()
 @click.argument("label", type=str, required=False)
 @click.pass_context
-def cli(ctx, config, label):
+def cli(ctx, config, color, label):
+    setup(color)
     log.debug("Loading config")
     config = get_config(config)
     label = label or config.get("default_job")
@@ -335,7 +339,7 @@ def cli(ctx, config, label):
             if isinstance(config[key], dict):
                 aliases = config[key].get("aliases")
                 alias_str = (
-                    colorful.gray(" ({})".format(", ".join(aliases)))
+                    color_wrap("gray", " ({})".format(", ".join(aliases)))
                     if aliases
                     else ""
                 )

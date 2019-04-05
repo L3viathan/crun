@@ -1,22 +1,44 @@
+import sys
 import logging
 import click
-import colorful
-
-logging.basicConfig(
-    style="{",
-    format="{} {}".format(colorful.green("{asctime}"), "{message}"),
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("runner")
-
 
 COLORS = {
-    "debug": colorful.brown,
-    "info": colorful.cyan,
-    "warning": colorful.orange,
-    "error": colorful.red,
-    "critical": colorful.bold_red,
+    "debug": "\x1b[38;5;131m",  # brown
+    "info": "\x1b[38;5;51m",  # cyan
+    "warning": "\x1b[38;5;214m",  # orange
+    "error": "\x1b[38;5;196m",  # red
+    "critical": "\x1b[1m\x1b[38;5;196m",  # bold red
+    "green": "\x1b[38;5;46m",
+    "white": "\x1b[38;5;231m",
+    "gray": "\x1b[38;5;250m",
 }
+
+USE_ANSI_CODES = False
+def color_wrap(color, string):
+    if not USE_ANSI_CODES:
+        return string
+    return "{}{}\x1b[39m".format(
+        COLORS.get(color, ""),
+        string,
+    )
+
+def color_start(color):
+    if not USE_ANSI_CODES:
+        return ""
+    return COLORS[color]
+
+def setup(color_mode="auto"):
+    global USE_ANSI_CODES
+    if sys.stderr.isatty() and color_mode != "never":
+        USE_ANSI_CODES = True
+    logging.basicConfig(
+        style="{",
+        format="{} {}".format(color_wrap("green", "{asctime}"), "{message}"),
+        datefmt="%H:%M:%S",
+    )
+
+logger = logging.getLogger("runner")
+
 
 
 class ColorfulCommand(click.Command):
@@ -39,11 +61,11 @@ class ColorfulCommand(click.Command):
 class ColoredHelpFormatter(click.HelpFormatter):
     def write_usage(self, prog, args="", prefix="Usage: "):
         return super().write_usage(
-            colorful.white(prog), args=args, prefix=colorful.green(prefix)
+            color_wrap("white", prog), args=args, prefix=color_wrap("green", prefix)
         )
 
     def write_heading(self, heading):
-        return super().write_heading(colorful.green(heading))
+        return super().write_heading(color_wrap("green", heading))
 
     # def write_dl(self, rows, col_max=30, col_spacing=2):
     #     ...
@@ -51,14 +73,14 @@ class ColoredHelpFormatter(click.HelpFormatter):
 
 class LogColorizer:
     @staticmethod
-    def arg_wrapper(log_color, arg):
+    def arg_wrapper(attr, arg):
         """
         Wrap an argument in white non-destructively.
 
-        If we'd use colorful.white() directly, we'd lose the style of the
+        If we'd use color_wrap("white", ...) directly, we'd lose the style of the
         surrounding log level.
         """
-        return "{}{}{}".format(colorful.white.style[0], arg, log_color.style[0])
+        return "{}{}{}".format(color_start("white"), arg, color_start(attr))
 
     def __getattr__(self, attr):
         """
@@ -68,20 +90,18 @@ class LogColorizer:
         appropriate color based on the log level of the message. Arguments are
         colored differently.
         """
-        log_color = COLORS[attr]
-
         def wrapper(message, *args, indent=0):
             return getattr(logger, attr)(
-                "{}› {}".format("  " * indent, log_color(message)),
-                *(self.arg_wrapper(log_color, arg) for arg in args)
+                "{}› {}".format("  " * indent, color_wrap(attr, message)),
+                *(self.arg_wrapper(attr, arg) for arg in args)
             )
 
         return wrapper
 
     def echo(self, message, *args):
         print(
-            str(colorful.cyan(message))
-            % tuple(colorful.white(arg) for arg in args)
+            color_wrap("cyan", message)
+            % tuple(color_wrap("white", arg) for arg in args)
         )
 
 

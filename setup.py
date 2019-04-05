@@ -5,7 +5,6 @@ setup(
     version="2.7.0",
     install_requires=[
         "click",
-        "colorful",
         "toml",
     ],
     author="L3viathan",
