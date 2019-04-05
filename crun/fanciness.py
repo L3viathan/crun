@@ -28,14 +28,20 @@ def color_start(color):
     return COLORS[color]
 
 
-def setup(color_mode="auto"):
+def setup(color_mode="auto", file=None):
     global USE_ANSI_CODES
-    if sys.stderr.isatty() and color_mode != "never":
+    if (
+        sys.stderr.isatty()
+        and color_mode != "never"
+        and (not file or color_mode == "always")
+    ):
         USE_ANSI_CODES = True
     logging.basicConfig(
         style="{",
         format="{} {}".format(color_wrap("green", "{asctime}"), "{message}"),
         datefmt="%H:%M:%S",
+        # sorry:
+        **{"handlers": [logging.FileHandler(file)] for _ in range(1) if file},
     )
 
 
@@ -97,7 +103,7 @@ class LogColorizer:
         def wrapper(message, *args, indent=0):
             return getattr(logger, attr)(
                 "{}› {}".format("  " * indent, color_wrap(attr, message)),
-                *(self.arg_wrapper(attr, arg) for arg in args)
+                *(self.arg_wrapper(attr, arg) for arg in args),
             )
 
         return wrapper

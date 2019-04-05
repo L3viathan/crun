@@ -349,11 +349,11 @@ class BuiltinJob(Job):
 @click.argument("label", type=str, required=False)
 @click.pass_context
 def cli(ctx, config, color, label):
-    setup(color)
-    log.debug("Loading config")
     config = get_config(config)
     if "loglevel" in config:
         log.setLevel(config["loglevel"])
+    setup(color, config.get("logfile"))
+    log.debug("Loaded config")
     label = label or config.get("default_job")
 
     if not label:
