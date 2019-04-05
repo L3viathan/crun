@@ -108,6 +108,9 @@ class LogColorizer:
             % tuple(color_wrap("white", arg) for arg in args)
         )
 
+    def setLevel(self, level):
+        logger.setLevel(getattr(logging, level))
+
 
 log = LogColorizer()
 

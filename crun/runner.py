@@ -352,6 +352,8 @@ def cli(ctx, config, color, label):
     setup(color)
     log.debug("Loading config")
     config = get_config(config)
+    if "loglevel" in config:
+        log.setLevel(config["loglevel"])
     label = label or config.get("default_job")
 
     if not label:
