@@ -14,18 +14,19 @@ COLORS = {
 }
 
 USE_ANSI_CODES = False
+
+
 def color_wrap(color, string):
     if not USE_ANSI_CODES:
         return string
-    return "{}{}\x1b[39m".format(
-        COLORS.get(color, ""),
-        string,
-    )
+    return "{}{}\x1b[39m".format(COLORS.get(color, ""), string)
+
 
 def color_start(color):
     if not USE_ANSI_CODES:
         return ""
     return COLORS[color]
+
 
 def setup(color_mode="auto"):
     global USE_ANSI_CODES
@@ -37,8 +38,8 @@ def setup(color_mode="auto"):
         datefmt="%H:%M:%S",
     )
 
-logger = logging.getLogger("runner")
 
+logger = logging.getLogger("runner")
 
 
 class ColorfulCommand(click.Command):
@@ -61,7 +62,9 @@ class ColorfulCommand(click.Command):
 class ColoredHelpFormatter(click.HelpFormatter):
     def write_usage(self, prog, args="", prefix="Usage: "):
         return super().write_usage(
-            color_wrap("white", prog), args=args, prefix=color_wrap("green", prefix)
+            color_wrap("white", prog),
+            args=args,
+            prefix=color_wrap("green", prefix),
         )
 
     def write_heading(self, heading):
@@ -90,6 +93,7 @@ class LogColorizer:
         appropriate color based on the log level of the message. Arguments are
         colored differently.
         """
+
         def wrapper(message, *args, indent=0):
             return getattr(logger, attr)(
                 "{}› {}".format("  " * indent, color_wrap(attr, message)),
@@ -112,9 +116,9 @@ def _set_verbosity(_, arg, val):
     if val:
         current = logger.getEffectiveLevel()
         if arg.name == "verbose":
-            logger.setLevel(current - val * 10)
+            logger.setLevel(min(logging.DEBUG, current - val * 10))
         elif arg.name == "quiet":
-            logger.setLevel(current + val * 10)
+            logger.setLevel(max(logging.FATAL, current + val * 10))
 
 
 def click_verbosity(pass_through=False, level=logging.INFO):
