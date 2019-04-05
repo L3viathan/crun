@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="crun",
-    version="2.8.1",
+    version="2.9.0",
     install_requires=[
         "click",
         "toml",
