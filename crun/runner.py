@@ -180,12 +180,20 @@ class Job:
         job = None
         if "run_if" in self.settings:
             job = get_job(
-                self.config, self.settings["run_if"], dry_run=self.dry_run, indent=self.indent + 1, parent=self
+                self.config,
+                self.settings["run_if"],
+                dry_run=self.dry_run,
+                indent=self.indent + 1,
+                parent=self,
             )
             should_fail = False
         if "run_unless" in self.settings:
             job = get_job(
-                self.config, self.settings["run_unless"], dry_run=self.dry_run, indent=self.indent + 1, parent=self
+                self.config,
+                self.settings["run_unless"],
+                dry_run=self.dry_run,
+                indent=self.indent + 1,
+                parent=self,
             )
             should_fail = True
         if not job:
@@ -221,7 +229,15 @@ class Pipeline(Job):
         for lab in self.settings["pipeline"]:
             if lab in self.settings:
                 config[lab].update(self.settings[lab])
-            self.jobs.append(get_job(config, lab, dry_run=dry_run, indent=self.indent + 1, parent=self))
+            self.jobs.append(
+                get_job(
+                    config,
+                    lab,
+                    dry_run=dry_run,
+                    indent=self.indent + 1,
+                    parent=self,
+                )
+            )
 
     def execute(self):
         log.info("Running pipeline %s", self.label, indent=self.indent)
@@ -291,7 +307,7 @@ class ConfigJob(Job):
         log.info("Running job %s", self.label, indent=self.indent)
         try:
             if self.dry_run:
-                log.info("Would run %s", cmd, indent=self.indent+1)
+                log.info("Would run %s", cmd, indent=self.indent + 1)
             else:
                 log.debug("Running command %s", cmd, indent=self.indent)
                 res = subprocess.run(
@@ -337,9 +353,11 @@ class BuiltinJob(Job):
     def execute(self):
         log.info("Running job %s", self.label, indent=self.indent)
         if self.dry_run:
-            log.info("Would run builtin %s", self.label, indent=self.indent+1)
+            log.info("Would run builtin %s", self.label, indent=self.indent + 1)
         else:
-            self.fn(self.label, self.options, self.settings, self.global_options)
+            self.fn(
+                self.label, self.options, self.settings, self.global_options
+            )
         log.info("Job %s finished", self.label, indent=self.indent)
 
 
