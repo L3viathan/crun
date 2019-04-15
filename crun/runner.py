@@ -88,8 +88,7 @@ def make_options(ctx):
     return options, positional
 
 
-def get_job(config, label, indent=0, parent=None):
-
+def get_job(config, label, dry_run=False, indent=0, parent=None):
     log.debug("Getting label %s", label, indent=indent)
 
     if "base" in config.get(label, ""):
@@ -113,19 +112,19 @@ def get_job(config, label, indent=0, parent=None):
     if label in config:
         if "pipeline" in config[label]:
             log.debug("Making new pipeline %s", label, indent=indent)
-            return Pipeline(config, label, indent, parent)
+            return Pipeline(config, label, indent, parent, dry_run)
         else:
             log.debug("Making new config job %s", label, indent=indent)
-            return ConfigJob(config, label, indent, parent)
+            return ConfigJob(config, label, indent, parent, dry_run)
     elif label.startswith("_"):
         log.debug("Making new builtin job %s", label, indent=indent)
-        return BuiltinJob(config, label, indent, parent)
+        return BuiltinJob(config, label, indent, parent, dry_run)
     log.critical("No job called %s was found", label, indent=indent)
     sys.exit(3)
 
 
 class Job:
-    def __init__(self, config, label, indent, parent):
+    def __init__(self, config, label, indent, parent, dry_run):
         self.label = label
         self.options = {}
         self.env = {}
@@ -133,6 +132,7 @@ class Job:
         self.config = config
         self.indent = indent
         self.parent = parent
+        self.dry_run = dry_run
 
     @property
     def positional(self):
@@ -180,12 +180,12 @@ class Job:
         job = None
         if "run_if" in self.settings:
             job = get_job(
-                self.config, self.settings["run_if"], self.indent + 1, self
+                self.config, self.settings["run_if"], dry_run=self.dry_run, indent=self.indent + 1, parent=self
             )
             should_fail = False
         if "run_unless" in self.settings:
             job = get_job(
-                self.config, self.settings["run_unless"], self.indent + 1, self
+                self.config, self.settings["run_unless"], dry_run=self.dry_run, indent=self.indent + 1, parent=self
             )
             should_fail = True
         if not job:
@@ -215,13 +215,13 @@ class Job:
 
 
 class Pipeline(Job):
-    def __init__(self, config, label, indent, parent):
-        super().__init__(config, label, indent, parent)
+    def __init__(self, config, label, indent, parent, dry_run):
+        super().__init__(config, label, indent, parent, dry_run)
         self.jobs = []
         for lab in self.settings["pipeline"]:
             if lab in self.settings:
                 config[lab].update(self.settings[lab])
-            self.jobs.append(get_job(config, lab, self.indent + 1, self))
+            self.jobs.append(get_job(config, lab, dry_run=dry_run, indent=self.indent + 1, parent=self))
 
     def execute(self):
         log.info("Running pipeline %s", self.label, indent=self.indent)
@@ -233,8 +233,8 @@ class Pipeline(Job):
 
 
 class ConfigJob(Job):
-    def __init__(self, config, label, indent, parent):
-        super().__init__(config, label, indent, parent)
+    def __init__(self, config, label, indent, parent, dry_run):
+        super().__init__(config, label, indent, parent, dry_run)
         self.cmd = self.settings["command"]
         self.options = {
             key: val for key, val in self.settings.get("options", {}).items()
@@ -290,11 +290,14 @@ class ConfigJob(Job):
 
         log.info("Running job %s", self.label, indent=self.indent)
         try:
-            log.debug("Running command %s", cmd, indent=self.indent)
-            res = subprocess.run(
-                cmd, env=self.env, shell=True, check=True, **self.sp_kwargs
-            )
-            self.write_output(res)
+            if self.dry_run:
+                log.info("Would run %s", cmd, indent=self.indent+1)
+            else:
+                log.debug("Running command %s", cmd, indent=self.indent)
+                res = subprocess.run(
+                    cmd, env=self.env, shell=True, check=True, **self.sp_kwargs
+                )
+                self.write_output(res)
             return log.info("Job %s finished", self.label, indent=self.indent)
         except subprocess.CalledProcessError as e:
             if self.settings.get("fail_ok", False):
@@ -327,13 +330,16 @@ class ConfigJob(Job):
 
 
 class BuiltinJob(Job):
-    def __init__(self, config, label, indent, parent):
-        super().__init__(config, label[1:], indent, parent)
+    def __init__(self, config, label, indent, parent, dry_run):
+        super().__init__(config, label[1:], indent, parent, dry_run)
         self.fn = getattr(builtin, label[1:])
 
     def execute(self):
         log.info("Running job %s", self.label, indent=self.indent)
-        self.fn(self.label, self.options, self.settings, self.global_options)
+        if self.dry_run:
+            log.info("Would run builtin %s", self.label, indent=self.indent+1)
+        else:
+            self.fn(self.label, self.options, self.settings, self.global_options)
         log.info("Job %s finished", self.label, indent=self.indent)
 
 
@@ -345,10 +351,12 @@ class BuiltinJob(Job):
 @click.option(
     "--color", type=click.Choice(["always", "auto", "never"]), default="auto"
 )
+@click.option("--dry-run", "-n", is_flag=True)
 @click_verbosity()
 @click.argument("label", type=str, required=False)
 @click.pass_context
-def cli(ctx, config, color, label):
+def cli(ctx, config, color, dry_run, label):
+    log.debug("Loading config")
     config = get_config(config)
     if "loglevel" in config:
         log.setLevel(config["loglevel"])
@@ -369,13 +377,15 @@ def cli(ctx, config, color, label):
                 log.echo("\t%s%s", key, alias_str)
         return
     options, positional = make_options(ctx)
-    job = get_job(config, label)
+    job = get_job(config, label, dry_run=dry_run)
 
     log.debug("Applying overrides from options")
     job.override_settings(options)
     job.global_options = options
     job.positional = positional
     try:
+        if dry_run:
+            log.info("Simulated execution:")
         job.run()
     except ValueError as e:
         log.critical(e.args[0])
