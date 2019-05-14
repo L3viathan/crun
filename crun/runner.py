@@ -109,6 +109,10 @@ def get_job(config, label, dry_run=False, indent=0, parent=None):
     }
     if label in aliases:
         label = aliases[label]
+    if label not in config and not label.startswith("_"):
+        matches = [key for key in config if key.startswith(label)]
+        if len(matches) == 1:
+            label = matches[0]
     if label in config:
         if "pipeline" in config[label]:
             log.debug("Making new pipeline %s", label, indent=indent)
