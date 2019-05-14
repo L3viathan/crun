@@ -109,10 +109,6 @@ def get_job(config, label, dry_run=False, indent=0, parent=None):
     }
     if label in aliases:
         label = aliases[label]
-    if label not in config and not label.startswith("_"):
-        matches = [key for key in config if key.startswith(label)]
-        if len(matches) == 1:
-            label = matches[0]
     if label in config:
         if "pipeline" in config[label]:
             log.debug("Making new pipeline %s", label, indent=indent)
@@ -123,7 +119,20 @@ def get_job(config, label, dry_run=False, indent=0, parent=None):
     elif label.startswith("_"):
         log.debug("Making new builtin job %s", label, indent=indent)
         return BuiltinJob(config, label, indent, parent, dry_run)
+    matches = [key for key in config if key.startswith(label)]
+    if len(matches) == 1:
+        return get_job(
+            config,
+            matches[0],
+            dry_run=dry_run,
+            indent=indent,
+            parent=parent,
+        )
     log.critical("No job called %s was found", label, indent=indent)
+    if matches:
+        log.info("Did you mean:", indent=indent)
+        for match in matches:
+            log.info("%s", match, indent=indent+1)
     sys.exit(3)
 
 
