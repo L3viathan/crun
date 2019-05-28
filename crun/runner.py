@@ -1,5 +1,6 @@
 import os
 import sys
+import ast
 import subprocess
 from pathlib import Path
 
@@ -45,10 +46,17 @@ def get_config(filename):
     except FileNotFoundError:
         raise click.BadOptionUsage(
             option_name="--config",
-            message=color_wrap(
-                "red", f"Configuration file {filename} not found."
-            ),
+            message=color_wrap("red", f"Configuration file {filename} not found."),
         )
+
+
+def get_virtualenv(venv, overridden):
+    cmd = "bash -c \". {venv}/bin/activate && {venv}/bin/python -c 'import os;print(os.environ)'\"".format(
+        venv=Path(venv).expanduser()
+    )
+    process = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
+    env = ast.literal_eval(process.stdout.decode("utf-8")[8:-2])
+    return dict(env, **overridden)
 
 
 def make_options(ctx):
@@ -122,17 +130,13 @@ def get_job(config, label, dry_run=False, indent=0, parent=None):
     matches = [key for key in config if key.startswith(label)]
     if len(matches) == 1:
         return get_job(
-            config,
-            matches[0],
-            dry_run=dry_run,
-            indent=indent,
-            parent=parent,
+            config, matches[0], dry_run=dry_run, indent=indent, parent=parent
         )
     log.critical("No job called %s was found", label, indent=indent)
     if matches:
         log.info("Did you mean:", indent=indent)
         for match in matches:
-            log.info("%s", match, indent=indent+1)
+            log.info("%s", match, indent=indent + 1)
     sys.exit(3)
 
 
@@ -180,8 +184,7 @@ class Job:
                     old[key] = new[key]
 
         log.debug(
-            f"Overriding {self.label} settings with {overrides}",
-            indent=self.indent,
+            f"Overriding {self.label} settings with {overrides}", indent=self.indent
         )
 
         merge_settings(self.settings, overrides)
@@ -211,9 +214,7 @@ class Job:
             should_fail = True
         if not job:
             return None
-        log.info(
-            "Checking preconditions of job %s", self.label, indent=self.indent
-        )
+        log.info("Checking preconditions of job %s", self.label, indent=self.indent)
         try:
             job.run()
         except subprocess.CalledProcessError:
@@ -224,11 +225,13 @@ class Job:
         precondition = self.should_run
         if precondition is False:
             log.info(
-                "Skipping job %s due to precondition",
-                self.label,
-                indent=self.indent,
+                "Skipping job %s due to precondition", self.label, indent=self.indent
             )
         else:
+            if "virtualenv" in self.settings:
+                self.env = get_virtualenv(
+                    self.settings["virtualenv"], self.settings.get("environment", {})
+                )
             self.execute()
 
     def execute(self):
@@ -244,11 +247,7 @@ class Pipeline(Job):
                 config[lab].update(self.settings[lab])
             self.jobs.append(
                 get_job(
-                    config,
-                    lab,
-                    dry_run=dry_run,
-                    indent=self.indent + 1,
-                    parent=self,
+                    config, lab, dry_run=dry_run, indent=self.indent + 1, parent=self
                 )
             )
 
@@ -270,10 +269,7 @@ class ConfigJob(Job):
         }
         self.env = os.environ.copy()
         self.env.update(
-            {
-                key: val
-                for key, val in self.settings.get("environment", {}).items()
-            }
+            {key: val for key, val in self.settings.get("environment", {}).items()}
         )
 
     def bake_options(self):
@@ -294,19 +290,14 @@ class ConfigJob(Job):
                 self.cmd.format(
                     **AttrDict(self.settings),
                     **{f"${key}": value for key, value in self.env.items()},
-                    **{
-                        f"#{i+1}": value
-                        for i, value in enumerate(self.positional)
-                    },
+                    **{f"#{i+1}": value for i, value in enumerate(self.positional)},
                     **{"#0": " ".join(self.positional)},
                 ),
                 self.bake_options(),
             )
         except KeyError as e:
             log.critical(
-                "Can't interpolate %s in command of job %s",
-                e.args[0],
-                self.label,
+                "Can't interpolate %s in command of job %s", e.args[0], self.label
             )
             sys.exit(4)
         except IndexError as e:
@@ -330,9 +321,7 @@ class ConfigJob(Job):
             return log.info("Job %s finished", self.label, indent=self.indent)
         except subprocess.CalledProcessError as e:
             if self.settings.get("fail_ok", False):
-                return log.info(
-                    "Job %s finished", self.label, indent=self.indent
-                )
+                return log.info("Job %s finished", self.label, indent=self.indent)
             log.error(
                 "Job %s returned with non-zero exit code %s",
                 self.label,
@@ -368,9 +357,7 @@ class BuiltinJob(Job):
         if self.dry_run:
             log.info("Would run builtin %s", self.label, indent=self.indent + 1)
         else:
-            self.fn(
-                self.label, self.options, self.settings, self.global_options
-            )
+            self.fn(self.label, self.options, self.settings, self.global_options)
         log.info("Job %s finished", self.label, indent=self.indent)
 
 
@@ -379,9 +366,7 @@ class BuiltinJob(Job):
     context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
 )
 @click.option("--config", "-c", type=click.Path(), default="project.toml")
-@click.option(
-    "--color", type=click.Choice(["always", "auto", "never"]), default="auto"
-)
+@click.option("--color", type=click.Choice(["always", "auto", "never"]), default="auto")
 @click.option("--dry-run", "-n", is_flag=True)
 @click_verbosity()
 @click.argument("label", type=str, required=False)
